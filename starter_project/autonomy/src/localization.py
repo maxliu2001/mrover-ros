@@ -12,14 +12,15 @@ from sensor_msgs.msg import NavSatFix, Imu
 
 # SE3 library for handling poses and TF tree
 from util.SE3 import SE3
-
+from util.SO3 import SO3
 
 class Localization:
     pose: SE3
 
     def __init__(self):
         # create subscribers for GPS and IMU data, linking them to our callback functions
-        # TODO
+        rospy.Subscriber("/gps/fix", NavSatFix, self.gps_callback)
+        rospy.Subscriber("/imu/imu_only", Imu, self.imu_callback)
 
         # create a transform broadcaster for publishing to the TF tree
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
@@ -34,7 +35,17 @@ class Localization:
         convert it to cartesian coordinates, store that value in `self.pose`, then publish
         that pose to the TF tree.
         """
-        # TODO
+        # rospy.loginfo(f"Received GPS data: {msg}")
+
+        spherical_coord = np.array([msg.latitude, msg.longitude])
+        cartesian_coord = self.spherical_to_cartesian(spherical_coord, [42.281, -83.743])
+
+        # Update self.pose with the new position
+        # Here we assume that the orientation has been previously set and is kept
+        self.pose = SE3(position=cartesian_coord, rotation=self.pose.rotation)
+
+        # Publish the updated pose to the TF tree
+        self.pose.publish_to_tf_tree(self.tf_broadcaster, "map", "base_link")
 
     def imu_callback(self, msg: Imu):
         """
@@ -42,7 +53,21 @@ class Localization:
         on the /imu topic. It should read the orientation data from the given Imu message,
         store that value in `self.pose`, then publish that pose to the TF tree.
         """
-        # TODO
+        # rospy.loginfo(f"Received IMU data: {msg}")
+        quaternion = np.array([
+            msg.orientation.x,
+            msg.orientation.y,
+            msg.orientation.z,
+            msg.orientation.w
+        ])
+
+        # Update self.pose with the new orientation
+        # Here we assume that the position has been previously set and is kept
+        self.pose = SE3(position=self.pose.position, rotation=SO3(quaternion=quaternion))
+
+        # Publish the updated pose to the TF tree
+        self.pose.publish_to_tf_tree(self.tf_broadcaster, "map", "base_link")
+
 
     @staticmethod
     def spherical_to_cartesian(spherical_coord: np.ndarray, reference_coord: np.ndarray) -> np.ndarray:
@@ -56,7 +81,22 @@ class Localization:
                                 given as a numpy array [latitude, longitude]
         :returns: the approximated cartesian coordinates in meters, given as a numpy array [x, y, z]
         """
-        # TODO
+        R = 6371000
+        lat = np.radians(spherical_coord[0])
+        lon = np.radians(spherical_coord[1])
+        ref_lat = np.radians(reference_coord[0])
+        ref_lon = np.radians(reference_coord[1])
+        # Calculate the Cartesian coordinates before rotation
+        x = R * (lat - ref_lat)
+        y = R * (lon - ref_lon) * np.cos(ref_lat)
+        # Rotate the point by 90 degrees to align with the simulator's reference heading
+        # Rotation matrix for 90 degrees: [ [0, -1], [1, 0] ]
+        x_rotated = -y
+        y_rotated = x
+        # Z coordinate is set to zero for this project
+        z = 0
+        return np.array([x_rotated, y_rotated, z])
+
 
 
 def main():

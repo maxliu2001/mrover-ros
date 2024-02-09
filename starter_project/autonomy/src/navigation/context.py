@@ -18,15 +18,21 @@ class Rover:
 
     def get_pose(self) -> Optional[SE3]:
         # TODO: return the pose of the rover (or None if we don't have one (catch exception))
-        pass
+        try:
+            # Assuming 'ctx' has an attribute 'tf_buffer' which is a tf2_ros.Buffer
+            return SE3.from_tf_tree(self.ctx.tf_buffer, "map", "base_link")
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            rospy.logwarn(f"Unable to determine rover's pose: {e}")
+            return None
 
     def send_drive_command(self, twist: Twist):
         # TODO: send the Twist message to the rover
-        pass
+        self.ctx.vel_cmd_publisher.publish(twist)
 
     def send_drive_stop(self):
         # TODO: tell the rover to stop
-        pass
+        stop_twist = Twist()  # Initializes all velocities to 0
+        self.send_drive_command(stop_twist)
 
 
 @dataclass
@@ -41,7 +47,7 @@ class Environment:
 
     def receive_fid_data(self, message: StarterProjectTag):
         # TODO: handle incoming FID data messages here
-        pass
+        self.fid_pos = message
 
     def get_fid_data(self) -> Optional[StarterProjectTag]:
         """
@@ -49,7 +55,7 @@ class Environment:
         if it exists, otherwise returns None
         """
         # TODO: return either None or your position message
-        pass
+        return self.fid_pos
 
 
 class Context:

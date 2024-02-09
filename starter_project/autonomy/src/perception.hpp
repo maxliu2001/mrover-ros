@@ -21,7 +21,11 @@
 #if __has_include(<mrover/StarterProjectTag.h>)
 #include <mrover/StarterProjectTag.h>
 #else
-struct StarterProjectTag {};
+struct StarterProjectTag {
+    int id;
+    float center_diff;
+    float closeness;
+};
 #endif
 
 namespace mrover {
